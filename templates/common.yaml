@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: "{{ .Values.Namespace }}"
+  labels:
+    name: Emby
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: emby-config
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: "{{ .Values.ConfigSize }}"
+  persistentVolumeReclaimPolicy: Retain
+  accessModes:
+  - ReadWriteOnce
+  hostPath:
+    path: "{{ .Values.HostConfigPath }}"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: emby-media
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: "{{ .Values.MediaSize }}"
+  persistentVolumeReclaimPolicy: Retain
+  accessModes:
+  - ReadWriteOnce
+  hostPath:
+    path: "{{ .Values.HostMediaPath }}"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: emby-config-claim
+  namespace: "{{ .Values.Namespace }}"
+spec:
+  storageClassName: manual
+  accessModes:
+  - ReadWriteOnce
+  volumeName: emby-config
+  resources:
+    requests:
+      storage: "{{ .Values.ConfigSize }}"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: emby-media-claim
+  namespace: "{{ .Values.Namespace }}"
+spec:
+  storageClassName: manual
+  accessModes:
+  - ReadWriteOnce
+  volumeName: emby-media
+  resources:
+    requests:
+      storage: "{{ .Values.StorageSize }}"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emby-deploy
+  namespace: "{{ .Values.Namespace }}"
+spec:
+  template:
+    metadata:
+      name: emby-app
+      labels: 
+        name: emby-app
+    spec:
+      volumes:
+        - name: emby-media
+          persistentVolumeClaim:
+            claimName: emby-media-claim
+        - name: emby-config
+          persistentVolumeClaim:
+            claimName: emby-config-claim
+      containers:
+      - name: emby
+        image: 19780529/embyserver:1.1
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: TZ
+          value: Europe/Moscow
+        - name: UID
+          value: "1000"
+        - name: GID
+          value: "100"
+        - name: GIDLIST
+          value: "100"
+        volumeMounts:
+        - name: emby-config
+          mountPath: "/config/"
+        - name: emby-media
+          mountPath: "/data/"
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 0
+  replicas: 1 
+  selector:
+    matchLabels:
+      name: emby-app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: emby-service
+  namespace: "{{ .Values.Namespace }}"
+spec:
+  selector:
+    name: emby-app
+  ports: 
+  - name: emby-web
+    protocol: TCP
+    port: 8096
+    targetPort: 8096
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt
+  name: emby-web-ingress
+  namespace: "{{ .Values.Namespace }}"
+spec:
+  rules:
+  - host: "{{ .Values.FQDN }}"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: emby-service
+            port:
+              number: 8096
+    tls:
+    - hosts:
+      - "{{ .Values.FQDN }}"
+      secretName: "{{ .Values.SecretName }}"

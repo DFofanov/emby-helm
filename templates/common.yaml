@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   name: "{{ .Values.Namespace }}"
   labels:
-    name: Emby
+    name: emby
 ---
 #apiVersion: v1
 #kind: PersistentVolume

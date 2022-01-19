@@ -1,5 +1,5 @@
 FQDN: "global.domain"
-Namespace: "Emby"
+Namespace: "emby"
 ConfigSize: "10Gi"
 HostConfigPath: "/config"
 MediaSize: "10Gi"

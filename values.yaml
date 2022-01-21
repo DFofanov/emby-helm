@@ -1,5 +1,4 @@
 FQDN: "m.dfv24.com"
-Namespace: "emby"
 ConfigSize: "10Gi"
 HostConfigPath: "/storage/k8sSSD/emby"
 #MediaSize: "10Gi"

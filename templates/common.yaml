@@ -1,26 +1,19 @@
 apiVersion: v1
-kind: Namespace
+kind: PersistentVolume
 metadata:
-  name: "{{ .Values.Namespace }}"
+  name: emby-config-pv
   labels:
-    name: emby
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: "{{ .Values.ConfigSize }}"
+  persistentVolumeReclaimPolicy: Retain
+  accessModes:
+  - ReadWriteOnce
+  hostPath:
+    path: "{{ .Values.HostConfigPath }}"
 ---
-#apiVersion: v1
-#kind: PersistentVolume
-#metadata:
-#  name: emby-config
-#  labels:
-#    type: local
-#spec:
-#  storageClassName: manual
-#  capacity:
-#    storage: "{{ .Values.ConfigSize }}"
-#  persistentVolumeReclaimPolicy: Retain
-#  accessModes:
-#  - ReadWriteOnce
-#  hostPath:
-#    path: "{{ .Values.HostConfigPath }}"
-#---
 #apiVersion: v1
 #kind: PersistentVolume
 #metadata:
@@ -37,20 +30,19 @@ metadata:
 #  hostPath:
 #    path: "{{ .Values.HostMediaPath }}"
 #---
-#apiVersion: v1
-#kind: PersistentVolumeClaim
-#metadata:
-#  name: emby-config-claim
-#  namespace: "{{ .Values.Namespace }}"
-#spec:
-#  storageClassName: manual
-#  accessModes:
-#  - ReadWriteOnce
-#  volumeName: emby-config
-#  resources:
-#    requests:
-#      storage: "{{ .Values.ConfigSize }}"
-#---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: emby-config-pvc
+spec:
+  storageClassName: manual
+  accessModes:
+  - ReadWriteOnce
+  volumeName: emby-config-pv
+  resources:
+    requests:
+      storage: "{{ .Values.ConfigSize }}"
+---
 #apiVersion: v1
 #kind: PersistentVolumeClaim
 #metadata:
@@ -69,7 +61,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: emby-deploy
-  namespace: "{{ .Values.Namespace }}"
 spec:
   template:
     metadata:
@@ -77,10 +68,10 @@ spec:
       labels: 
         name: emby-app
     spec:
-#      volumes:
-#        - name: emby-media
-#          persistentVolumeClaim:
-#            claimName: emby-media-claim
+      volumes:
+        - name: emby-config-storage
+          persistentVolumeClaim:
+            claimName: emby-config-pvc
 #        - name: emby-config
 #          persistentVolumeClaim:
 #            claimName: emby-config-claim
@@ -97,11 +88,11 @@ spec:
           value: "100"
         - name: GIDLIST
           value: "100"
-#        volumeMounts:
-#        - name: emby-config
-#          mountPath: "/config/"
+        volumeMounts:
+        - name: emby-config-storage
+          mountPath: "/config"
 #        - name: emby-media
-#          mountPath: "/data/"
+#          mountPath: "/data"
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       terminationGracePeriodSeconds: 0
@@ -114,7 +105,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: emby-service
-  namespace: "{{ .Values.Namespace }}"
 spec:
   selector:
     name: emby-app
@@ -129,9 +119,8 @@ kind: Ingress
 metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
-#    cert-manager.io/cluster-issuer: letsencrypt
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   name: emby-web-ingress
-  namespace: "{{ .Values.Namespace }}"
 spec:
   rules:
   - host: "{{ .Values.FQDN }}"
@@ -144,7 +133,7 @@ spec:
             name: emby-service
             port:
               number: 8096
-#    tls:
-#    - hosts:
-#      - "{{ .Values.FQDN }}"
-#      secretName: "{{ .Values.SecretName }}"
+    tls:
+    - hosts:
+      - "{{ .Values.FQDN }}"
+      secretName: app-emby-tls

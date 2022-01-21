@@ -133,7 +133,7 @@ spec:
             name: emby-service
             port:
               number: 8096
-    tls:
-    - hosts:
-      - "{{ .Values.FQDN }}"
-      secretName: app-emby-tls
+  tls:
+  - hosts:
+    - "{{ .Values.FQDN }}"
+    secretName: app-emby-tls

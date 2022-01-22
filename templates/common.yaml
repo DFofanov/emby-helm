@@ -17,25 +17,45 @@ spec:
     storage: "{{ .Values.ConfigSize }}"
   persistentVolumeReclaimPolicy: Retain
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   hostPath:
     path: "{{ .Values.HostConfigPath }}"
 ---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: emby-media-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: "{{ .Values.MediaSize }}"
+  persistentVolumeReclaimPolicy: Retain
+  accessModes:
+  - ReadWriteMany
+  hostPath:
+    path: "{{ .Values.HostMediaPath }}"
+---
+# NFS mount
 #apiVersion: v1
 #kind: PersistentVolume
 #metadata:
-#  name: emby-media
-#  labels:
-#    type: local
+#  name: emby-media-pv
 #spec:
-#  storageClassName: manual
 #  capacity:
 #    storage: "{{ .Values.MediaSize }}"
-#  persistentVolumeReclaimPolicy: Retain
+#  volumeMode: Filesystem
 #  accessModes:
-#  - ReadWriteOnce
-#  hostPath:
+#    - ReadWriteMany
+#  persistentVolumeReclaimPolicy: Recycle
+#  storageClassName: nfs
+#  mountOptions:
+#    - hard
+#    - nfsvers=4.1
+#  nfs:
 #    path: "{{ .Values.HostMediaPath }}"
+#    server: "{{ .Values.ServerMediaIP }}"
 #---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -45,25 +65,38 @@ metadata:
 spec:
   storageClassName: manual
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   volumeName: emby-config-pv
   resources:
     requests:
       storage: "{{ .Values.ConfigSize }}"
 ---
-#apiVersion: v1
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: emby-media-pvc
+  namespace: emby
+spec:
+  storageClassName: manual
+  accessModes:
+  - ReadWriteMany
+  volumeName: emby-media-pv
+  resources:
+    requests:
+      storage: "{{ .Values.MediaSize }}"
+---
+# NFS mount
 #kind: PersistentVolumeClaim
 #metadata:
-#  name: emby-media-claim
-#  namespace: "{{ .Values.Namespace }}"
+#  name: emby-media-pvc
+#  namespace: emby
 #spec:
-#  storageClassName: manual
+#  storageClassName: nfs
 #  accessModes:
-#  - ReadWriteOnce
-#  volumeName: emby-media
+#    - ReadWriteMany
 #  resources:
 #    requests:
-#      storage: "{{ .Values.StorageSize }}"
+#      storage: 200Gi
 #---
 apiVersion: apps/v1
 kind: Deployment
@@ -78,9 +111,9 @@ spec:
         name: emby-app
     spec:
       volumes:
-#        - name: emby-media
-#          persistentVolumeClaim:
-#            claimName: emby-media-claim
+        - name: emby-media-storage
+          persistentVolumeClaim:
+            claimName: emby-media-pvc
         - name: emby-config-storage
           persistentVolumeClaim:
             claimName: emby-config-pvc
@@ -100,8 +133,8 @@ spec:
         volumeMounts:
         - name: emby-config-storage
           mountPath: "/config/"
-#        - name: emby-media
-#          mountPath: "/data/"
+        - name: emby-media-storage
+          mountPath: "/data/"
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       terminationGracePeriodSeconds: 0

@@ -1,5 +1,6 @@
 FQDN: "m.dfv24.com"
 ConfigSize: "10Gi"
 HostConfigPath: "/storage/k8sSSD/emby"
-#MediaSize: "10Gi"
-#HostMediaPath: "/media"
+MediaSize: "200Gi"
+HostMediaPath: "/media"
+ServerMediaIP: "10.120.10.10"
